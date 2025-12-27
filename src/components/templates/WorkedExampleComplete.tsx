@@ -3,10 +3,23 @@ import { type WorkedExampleItem, type TemplateProps } from '../../types/itemType
 import { FractionInput } from '../FractionInput';
 
 /**
+ * MathSpan (Sub-component)
+ * * WHY: This is the fix for the "formatting gone" issue.
+ * HOW: By using React.memo, we tell React to only re-render this span if the 'html'
+ * string actually changes. When a user types in an input box, the parent re-renders,
+ * but this component stays stable. This prevents React from overwriting the 
+ * DOM nodes that KaTeX has already "beautified".
+ */
+const MathSpan = React.memo(({ html }: { html: string }) => (
+  <span dangerouslySetInnerHTML={{ __html: html }} />
+));
+
+/**
  * WorkedExampleComplete (CBSE Ch 2 Fractions)
  * 1. Renders multi-line LaTeX steps using dangerouslySetInnerHTML.
  * 2. Provides specialized FractionInput components for math completion.
- * 3. FIX: Repaired split math delimiters to ensure fractions render around input boxes.
+ * 3. FIX: Uses Memoized MathSpan to preserve formatting during state updates.
+ * 4. FIX: Repaired split math delimiters to ensure fractions render around input boxes.
  */
 export const WorkedExampleComplete: React.FC<TemplateProps<WorkedExampleItem>> = ({ item, onChangeLocal }) => {
   const [responses, setResponses] = useState<Record<string, string>>({});
@@ -31,16 +44,17 @@ export const WorkedExampleComplete: React.FC<TemplateProps<WorkedExampleItem>> =
     // Plain text line (no input)
     if (!step.blank_id) {
       return (
-        <div 
-          className="text-xl text-slate-600 mb-8 py-4 px-6 bg-slate-50/50 rounded-2xl border border-transparent" 
-          dangerouslySetInnerHTML={{ __html: step.line }} 
-        />
+        <div className="text-xl text-slate-600 mb-8 py-4 px-6 bg-slate-50/50 rounded-2xl border border-transparent">
+          <MathSpan html={step.line} />
+        </div>
       );
     }
 
     /**
      * Logic for balancing LaTeX delimiters:
-     * When splitting at '\boxed{...}', we often cut a '$$...$$' block in half.
+     * When splitting at '\boxed{\ \ \ }', we often cut a '$$...$$' block in half.
+     * Part 0: "1) $$\frac{3}{4}..." (Unclosed)
+     * Part 1: "...$$" (No opening)
      * We manually add closing/opening '$$' tags to the split parts so the browser 
      * finds complete math blocks to render.
      */
@@ -60,7 +74,7 @@ export const WorkedExampleComplete: React.FC<TemplateProps<WorkedExampleItem>> =
 
     return (
       <div className="flex items-center gap-6 mb-8 text-xl text-slate-900 bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm transition-all hover:border-indigo-100">
-        <span dangerouslySetInnerHTML={{ __html: leftHtml }} />
+        <MathSpan html={leftHtml} />
         
         <div className="flex items-center gap-3">
           {/* Conditional rendering of Input type based on JSON config */}
@@ -85,7 +99,7 @@ export const WorkedExampleComplete: React.FC<TemplateProps<WorkedExampleItem>> =
           )}
         </div>
 
-        {rightHtml && <span dangerouslySetInnerHTML={{ __html: rightHtml }} />}
+        {rightHtml && <MathSpan html={rightHtml} />}
       </div>
     );
   };

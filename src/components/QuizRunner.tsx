@@ -25,7 +25,7 @@ interface QuizRunnerProps {
  * 1. Properly handles localResponse resets.
  * 2. Added key switching to force-re-mount children on question change.
  * 3. Integrated KaTeX re-rendering trigger to fix fraction formatting.
- * 4. Updated prompt rendering to support LaTeX via the .latex property.
+ * 4. FIX: Added isReady state and opacity transitions to eliminate unformatted LaTeX "flash".
  */
 export const QuizRunner: React.FC<QuizRunnerProps> = ({ items }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -34,6 +34,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({ items }) => {
   const [localResponse, setLocalResponse] = useState<any>(null);
   const [lastResult, setLastResult] = useState<CommitResult | null>(null);
   const [showSolution, setShowSolution] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   // Determine which item to render based on current stage
   const currentItem = stage === 'MAIN' ? items[currentIndex] : items[currentIndex].transfer_item;
@@ -45,6 +46,9 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({ items }) => {
    * This effect triggers a re-scan of the page every time the question or result changes.
    */
   useEffect(() => {
+    // Hide content immediately when moving to a new state to avoid unformatted flash
+    setIsReady(false);
+
     const renderMath = () => {
       if (window.renderMathInElement) {
         window.renderMathInElement(document.body, {
@@ -56,6 +60,10 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({ items }) => {
           ],
           throwOnError: false
         });
+        
+        // WHY: We use requestAnimationFrame to ensure the browser has processed 
+        // the KaTeX DOM changes before we remove the 'opacity-0' class.
+        requestAnimationFrame(() => setIsReady(true));
       }
     };
 
@@ -127,12 +135,11 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({ items }) => {
 
       <main className="flex-1 flex overflow-hidden flex-col md:flex-row">
         {/* Left Side: Pedagogical Guidance & Instructions */}
-        <section className="w-full md:w-1/3 p-10 bg-white border-r border-slate-200 overflow-y-auto custom-scrollbar">
+        <section className={`w-full md:w-1/3 p-10 bg-white border-r border-slate-200 overflow-y-auto custom-scrollbar transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}>
           <div className="mb-10">
             <span className="inline-block px-4 py-1.5 mb-6 text-[10px] font-black tracking-[0.2em] text-indigo-600 bg-indigo-50 rounded-full uppercase border border-indigo-100">
               Module: {currentItem.template_id.replace(/_/g, ' ')}
             </span>
-            {/* Display LaTeX prompt if available, otherwise fallback to plain text */}
             <h1 className="text-3xl font-black leading-tight mb-6 text-slate-800">
               {currentItem.prompt.latex || currentItem.prompt.text}
             </h1>
@@ -152,7 +159,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({ items }) => {
         <section className="w-full md:w-2/3 p-12 relative flex flex-col items-center justify-center bg-slate-50/50">
           <div 
             key={`${currentItem.item_id}_${stage}`} // Key ensures component remounts and resets state on navigation
-            className="w-full max-w-3xl bg-white rounded-[3.5rem] shadow-2xl shadow-slate-200/50 p-12 border-4 border-white transition-all duration-500"
+            className={`w-full max-w-3xl bg-white rounded-[3.5rem] shadow-2xl shadow-slate-200/50 p-12 border-4 border-white transition-all duration-500 ${isReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
           >
             <TemplateRenderer 
               item={currentItem} 
