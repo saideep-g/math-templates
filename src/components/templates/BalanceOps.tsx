@@ -3,14 +3,14 @@ import { type BalanceOpsItem, type TemplateProps } from '../../types/itemTypes';
 import { RotateCcw } from 'lucide-react';
 
 /**
- * Corrected BalanceOps Template
- * Handles positive/negative constants and simplifies the equation 
- * correctly for both ADD and SUBTRACT operations.
+ * BalanceOps Interaction (CBSE Ch 4 Equations)
+ * 1. Handles positive and negative constants and simplifies display sign (e.g., handles "4x - 7").
+ * 2. Communicates numeric results and isolation state back to QuizRunner.
  */
 export const BalanceOps: React.FC<TemplateProps<BalanceOpsItem>> = ({ item, onChangeLocal }) => {
   const config = item.interaction.config;
   
-  // Track the coefficient and the constant on the left side independently
+  // Track state with numeric values to handle algebra logic correctly
   const [leftCoefficient, setLeftCoefficient] = useState(config.equation.left.a);
   const [leftConstant, setLeftConstant] = useState(config.equation.left.b);
   const [currentRight, setCurrentRight] = useState(config.equation.right.value);
@@ -19,7 +19,7 @@ export const BalanceOps: React.FC<TemplateProps<BalanceOpsItem>> = ({ item, onCh
   const [isolated, setIsolated] = useState(false);
   const [isDivided, setIsDivided] = useState(false);
 
-  // Reset internal state when a new question (item_id) is loaded
+  // Initialize/Reset state when the item changes
   useEffect(() => {
     setLeftCoefficient(config.equation.left.a);
     setLeftConstant(config.equation.left.b);
@@ -30,14 +30,18 @@ export const BalanceOps: React.FC<TemplateProps<BalanceOpsItem>> = ({ item, onCh
   }, [item.item_id]);
 
   /**
-   * Helper to format the left side of the equation based on current state.
-   * Handles signs correctly (e.g., 4x - 7 instead of 4x + -7).
+   * Helper to format the left side of the equation.
+   * Logic ensures that negative constants display as "4x - 7" rather than "4x + -7".
    */
   const formatLeftLabel = () => {
-    const varPart = leftCoefficient === 1 ? config.equation.left.variable : `${leftCoefficient}${config.equation.left.variable}`;
-    
     if (isDivided) return config.equation.left.variable;
-    if (leftConstant === 0) return varPart;
+
+    const varPart = leftCoefficient === 1 
+      ? config.equation.left.variable 
+      : `${leftCoefficient}${config.equation.left.variable}`;
+    
+    // Check for zero with float precision tolerance
+    if (Math.abs(leftConstant) < 0.0001) return varPart;
     
     const sign = leftConstant > 0 ? "+" : "-";
     return `${varPart} ${sign} ${Math.abs(leftConstant)}`;
@@ -58,8 +62,8 @@ export const BalanceOps: React.FC<TemplateProps<BalanceOpsItem>> = ({ item, onCh
     }
     
     if (op.op_id === 'DIVIDE') {
-      // If the constant is 0, we can divide the coefficient
-      if (leftConstant === 0 && op.value === leftCoefficient) {
+      // Isolation check: only allow successful isolation if constant is 0
+      if (Math.abs(leftConstant) < 0.0001 && Math.abs(op.value - leftCoefficient) < 0.0001) {
         setLeftCoefficient(1);
         setIsDivided(true);
         setIsolated(true);
@@ -74,23 +78,22 @@ export const BalanceOps: React.FC<TemplateProps<BalanceOpsItem>> = ({ item, onCh
     }
   };
 
-  // Synchronize internal state with the QuizRunner for scoring
+  // Synchronize internal state with the QuizRunner
   useEffect(() => {
-    const currentX = isolated ? currentRight : null;
     onChangeLocal?.({ 
       history, 
-      currentX, 
+      currentX: isolated ? currentRight : null, 
       isolated,
-      leftConstant // Useful for diagnostic tagging in scoring.ts
+      leftConstant,
+      leftCoefficient
     });
   }, [history, currentRight, leftConstant, leftCoefficient, isolated, isDivided]);
 
   return (
     <div className="flex flex-col items-center py-4 w-full">
-      {/* Visual Equation / Scale */}
       <div className="flex items-center gap-12 mb-16 w-full justify-center">
         <div className="flex flex-col items-center">
-          <div className="p-8 bg-indigo-50 border-4 border-indigo-100 rounded-[2.5rem] text-3xl font-black text-indigo-900 min-w-[200px] text-center shadow-inner transition-all duration-300">
+          <div className="p-8 bg-indigo-50 border-4 border-indigo-100 rounded-[2.5rem] text-3xl font-black text-indigo-900 min-w-[220px] text-center shadow-inner transition-all duration-300">
             {formatLeftLabel()}
           </div>
           <div className="w-40 h-3 bg-slate-200 rounded-full mt-4"></div>
@@ -100,27 +103,24 @@ export const BalanceOps: React.FC<TemplateProps<BalanceOpsItem>> = ({ item, onCh
 
         <div className="flex flex-col items-center">
           <div className="p-8 bg-indigo-50 border-4 border-indigo-100 rounded-[2.5rem] text-3xl font-black text-indigo-900 min-w-[160px] text-center shadow-inner transition-all duration-300">
-            {/* Round to 2 decimal places if needed for messy divisions */}
             {Number.isInteger(currentRight) ? currentRight : currentRight.toFixed(2)}
           </div>
           <div className="w-40 h-3 bg-slate-200 rounded-full mt-4"></div>
         </div>
       </div>
 
-      {/* Operation Control Buttons */}
-      <div className="grid grid-cols-2 gap-4 w-full max-w-md">
+      <div className="grid grid-cols-2 gap-4 w-full max-md">
         {config.operations.map(op => (
           <button
             key={op.op_id}
             onClick={() => applyOp(op)}
-            className="flex items-center justify-center p-6 bg-white border-2 border-slate-100 rounded-3xl font-black text-slate-700 hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm active:scale-95"
+            className="flex items-center justify-center p-6 bg-white border-2 border-slate-100 rounded-3xl font-black text-slate-700 hover:border-indigo-400 hover:bg-indigo-50 transition-all shadow-sm active:scale-95"
           >
             {op.label} <span className="ml-2 text-[10px] text-slate-400 uppercase tracking-widest font-bold">Both Sides</span>
           </button>
         ))}
       </div>
 
-      {/* History and Reset Controls */}
       {history.length > 0 && (
         <div className="mt-10 w-full flex justify-between items-center px-6">
           <div className="flex gap-2 flex-wrap max-w-[70%]">
@@ -141,7 +141,7 @@ export const BalanceOps: React.FC<TemplateProps<BalanceOpsItem>> = ({ item, onCh
             }}
             className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase hover:text-rose-500 transition-colors"
           >
-            <RotateCcw size={16} /> Reset
+            <RotateCcw size={16} /> Reset Equation
           </button>
         </div>
       )}
