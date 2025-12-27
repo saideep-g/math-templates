@@ -103,7 +103,8 @@ export const BalanceOps: React.FC<TemplateProps<BalanceOpsItem>> = ({ item, onCh
 
         <div className="flex flex-col items-center">
           <div className="p-8 bg-indigo-50 border-4 border-indigo-100 rounded-[2.5rem] text-3xl font-black text-indigo-900 min-w-[160px] text-center shadow-inner transition-all duration-300">
-            {Number.isInteger(currentRight) ? currentRight : currentRight.toFixed(2)}
+            {/* Round to 2 decimal places if not an integer, otherwise show clean number */}
+            {Number.isInteger(currentRight) ? currentRight : Math.round(currentRight * 100) / 100}
           </div>
           <div className="w-40 h-3 bg-slate-200 rounded-full mt-4"></div>
         </div>

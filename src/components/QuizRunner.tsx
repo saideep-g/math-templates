@@ -25,6 +25,7 @@ interface QuizRunnerProps {
  * 1. Properly handles localResponse resets.
  * 2. Added key switching to force-re-mount children on question change.
  * 3. Integrated KaTeX re-rendering trigger to fix fraction formatting.
+ * 4. Updated prompt rendering to support LaTeX via the .latex property.
  */
 export const QuizRunner: React.FC<QuizRunnerProps> = ({ items }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -44,17 +45,26 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({ items }) => {
    * This effect triggers a re-scan of the page every time the question or result changes.
    */
   useEffect(() => {
-    if (window.renderMathInElement) {
-      window.renderMathInElement(document.body, {
-        delimiters: [
-          { left: '$$', right: '$$', display: true },
-          { left: '$', right: '$', display: false },
-          { left: '\\(', right: '\\)', display: false },
-          { left: '\\[', right: '\\]', display: true }
-        ],
-        throwOnError: false
-      });
-    }
+    const renderMath = () => {
+      if (window.renderMathInElement) {
+        window.renderMathInElement(document.body, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\(', right: '\\)', display: false },
+            { left: '\\[', right: '\\]', display: true }
+          ],
+          throwOnError: false
+        });
+      }
+    };
+
+    // Initial render call
+    renderMath();
+    
+    // Short delay to catch any late-mounting DOM elements or late-loading KaTeX scripts
+    const timer = setTimeout(renderMath, 100);
+    return () => clearTimeout(timer);
   }, [currentIndex, stage, attempt, showSolution, lastResult]);
 
   /**
@@ -122,8 +132,9 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({ items }) => {
             <span className="inline-block px-4 py-1.5 mb-6 text-[10px] font-black tracking-[0.2em] text-indigo-600 bg-indigo-50 rounded-full uppercase border border-indigo-100">
               Module: {currentItem.template_id.replace(/_/g, ' ')}
             </span>
+            {/* Display LaTeX prompt if available, otherwise fallback to plain text */}
             <h1 className="text-3xl font-black leading-tight mb-6 text-slate-800">
-              {currentItem.prompt.text}
+              {currentItem.prompt.latex || currentItem.prompt.text}
             </h1>
             <p className="text-slate-400 text-lg font-bold italic leading-relaxed">
               {currentItem.instruction}
